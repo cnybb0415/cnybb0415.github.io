@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#F7EFE4" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="description" content="나영님 전용 비서실 대시보드 — 오피스 맵, 회의실, 작업실, 비서현황, 메모" />
+<meta name="referrer" content="no-referrer" />
+<title>나영 비서실</title>
+<script>try{if(localStorage.getItem('ny-office:auth')==='ok')document.documentElement.classList.add('is-authed');}catch(e){}</script>
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%91%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+
+<!-- ═══ PIN 잠금 ═══ -->
+<div class="lock" id="lockScreen" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+  <div class="lock-card">
+    <div class="lock-badge" aria-hidden="true">🔒</div>
+    <h2 class="lock-title" id="lockTitle">나영 비서실</h2>
+    <p class="lock-sub" id="lockSub">4자리 PIN을 입력해 주세요</p>
+    <div class="lock-dots" id="lockDots" aria-hidden="true">
+      <span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span>
+    </div>
+    <div class="lock-keys" id="lockKeys" role="group" aria-label="숫자 키패드">
+      <button class="lock-key" type="button" data-key="1">1</button>
+      <button class="lock-key" type="button" data-key="2">2</button>
+      <button class="lock-key" type="button" data-key="3">3</button>
+      <button class="lock-key" type="button" data-key="4">4</button>
+      <button class="lock-key" type="button" data-key="5">5</button>
+      <button class="lock-key" type="button" data-key="6">6</button>
+      <button class="lock-key" type="button" data-key="7">7</button>
+      <button class="lock-key" type="button" data-key="8">8</button>
+      <button class="lock-key" type="button" data-key="9">9</button>
+      <span class="lock-key lock-key-blank" aria-hidden="true"></span>
+      <button class="lock-key" type="button" data-key="0">0</button>
+      <button class="lock-key lock-key-del" type="button" data-key="del" aria-label="한 자리 지우기">⌫</button>
+    </div>
+  </div>
+  <p class="lock-foot">나영님 전용 · 비공개 대시보드</p>
+</div>
+
+<div class="app">
+
+  <div class="top-fixed">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-face" aria-hidden="true">👑</div>
+        <div class="brand-text">
+          <h1>나영 비서실</h1>
+          <p class="owner"><span class="dot dot-green"></span><span>나영님 전용</span></p>
+        </div>
+      </div>
+      <button class="conn-badge" id="connBadge" type="button" aria-expanded="false" aria-controls="connSheet">
+        <span class="dot dot-green"></span><span class="conn-label">노션·깃허브 연동</span>
+      </button>
+      <button class="lock-btn" id="lockBtn" type="button" aria-label="대시보드 잠금">🔒 <span>잠금</span></button>
+    </header>
+
+    <div class="conn-sheet" id="connSheet" hidden>
+      <p class="conn-title">연결된 곳</p>
+      <ul class="conn-list" id="connList"></ul>
+    </div>
+
+    <nav class="tabs" id="tabs" role="tablist" aria-label="비서실 탭">
+      <button class="tab is-active" role="tab" id="tabbtn-map" data-tab="map" aria-selected="true" aria-controls="panel-map">
+        <span class="tab-emoji" aria-hidden="true">🗺️</span><span class="tab-label">오피스 맵</span>
+      </button>
+      <button class="tab" role="tab" id="tabbtn-meeting" data-tab="meeting" aria-selected="false" aria-controls="panel-meeting" tabindex="-1">
+        <span class="tab-emoji" aria-hidden="true">💬</span><span class="tab-label">회의실</span>
+      </button>
+      <button class="tab" role="tab" id="tabbtn-work" data-tab="work" aria-selected="false" aria-controls="panel-work" tabindex="-1">
+        <span class="tab-emoji" aria-hidden="true">📋</span><span class="tab-label">작업실</span>
+      </button>
+      <button class="tab" role="tab" id="tabbtn-staff" data-tab="staff" aria-selected="false" aria-controls="panel-staff" tabindex="-1">
+        <span class="tab-emoji" aria-hidden="true">📊</span><span class="tab-label">비서현황</span>
+      </button>
+      <button class="tab" role="tab" id="tabbtn-memo" data-tab="memo" aria-selected="false" aria-controls="panel-memo" tabindex="-1">
+        <span class="tab-emoji" aria-hidden="true">📝</span><span class="tab-label">메모</span>
+      </button>
+    </nav>
+  </div>
+
+  <main>
+
+    <!-- ═══ 오피스 맵 ═══ -->
+    <section class="panel is-active" id="panel-map" role="tabpanel" aria-labelledby="tabbtn-map">
+      <div class="hero card">
+        <span class="hero-label" id="heroLabel">🌸 나영 비서실 본부</span>
+        <h2 id="heroTitle">대장님, 비서 3명이 대기 중이에요</h2>
+        <p id="heroDesc">방을 눌러 들어가 보세요. 방마다 비서가 일하고 있어요.</p>
+      </div>
+
+      <div class="map-chips" id="mapChips"></div>
+
+      <div class="map-wrap">
+        <picture>
+          <source srcset="assets/office-map.webp" type="image/webp" />
+          <img class="map-img" src="assets/office-map.png" alt="따뜻한 나무색 아이소메트릭 오피스 — 지휘실, 대회의실, 작업실, 라운지" width="1024" height="1024" />
+        </picture>
+        <button class="room-pin" data-room="command" data-go="meeting" style="left:46%;top:35%" type="button">
+          <span class="pin-dot" aria-hidden="true"></span>🎯 지휘실
+        </button>
+        <button class="room-pin" data-room="main" data-go="meeting" style="left:23%;top:50%" type="button">
+          <span class="pin-dot" aria-hidden="true"></span>🏛️ 대회의실
+        </button>
+        <button class="room-pin" data-go="work" style="left:62%;top:56%" type="button">
+          <span class="pin-dot" aria-hidden="true"></span>🖥️ 작업실
+        </button>
+        <button class="room-pin" data-room="lounge" data-go="meeting" style="left:70%;top:72%" type="button">
+          <span class="pin-dot" aria-hidden="true"></span>☕ 라운지
+        </button>
+      </div>
+
+      <div class="stat-row" id="mapStats"></div>
+
+      <div class="section-head">
+        <h3>오늘의 요약</h3>
+        <button class="text-btn" type="button" data-go="work">전체 보기 →</button>
+      </div>
+      <div class="mini-list" id="mapTaskMini"></div>
+
+      <div class="section-head">
+        <h3>다음 일정</h3>
+        <span class="section-note" id="updatedNote"></span>
+      </div>
+      <ul class="schedule-list" id="mapSchedule"></ul>
+    </section>
+
+    <!-- ═══ 회의실 ═══ -->
+    <section class="panel" id="panel-meeting" role="tabpanel" aria-labelledby="tabbtn-meeting" hidden>
+      <div class="room-chips" id="roomChips" role="group" aria-label="방 선택"></div>
+      <p class="room-status" id="roomStatus">🎯 지휘실 · ON 3명</p>
+
+      <div class="chat" id="chatList" aria-live="polite"></div>
+
+      <div class="composer">
+        <div class="composer-row">
+          <span class="composer-label">발신</span>
+          <div class="chip-scroll" id="senderChips" role="group" aria-label="발신자"></div>
+        </div>
+        <div class="composer-row">
+          <span class="composer-label">멘션</span>
+          <div class="chip-scroll" id="mentionChips" role="group" aria-label="멘션"></div>
+        </div>
+        <textarea id="chatInput" class="composer-input" rows="1" placeholder="복사해서 귤이에게 그대로 보낼 말을 적어 두세요." aria-label="메시지 입력"></textarea>
+        <div class="composer-actions">
+          <button class="btn btn-ghost" type="button" id="sendBtn">말풍선에 남기기</button>
+          <button class="btn btn-primary" type="button" id="copyCmdBtn">명령 복사</button>
+          <button class="btn btn-soft" type="button" id="notionBtn">노션 기록</button>
+        </div>
+        <p class="composer-hint" id="chatHint">말풍선은 이 브라우저에만 저장 · 실제 지시는 복사해서 귤이에게 보내세요.</p>
+      </div>
+    </section>
+
+    <!-- ═══ 작업실 ═══ -->
+    <section class="panel" id="panel-work" role="tabpanel" aria-labelledby="tabbtn-work" hidden>
+      <div class="work-head">
+        <h2>작업실</h2>
+        <p>지금 돌고 있는 일과 끝난 일을 모아 뒀어요.</p>
+      </div>
+      <div class="filter-row" id="workFilters" role="group" aria-label="작업 필터">
+        <button class="filter is-active" data-filter="all" type="button">전체</button>
+        <button class="filter" data-filter="active" type="button">진행 중</button>
+        <button class="filter" data-filter="planned" type="button">예정</button>
+        <button class="filter" data-filter="done" type="button">완료</button>
+      </div>
+      <div class="task-list" id="taskList"></div>
+    </section>
+
+    <!-- ═══ 비서현황 ═══ -->
+    <section class="panel" id="panel-staff" role="tabpanel" aria-labelledby="tabbtn-staff" hidden>
+      <div class="work-head">
+        <h2>비서현황</h2>
+        <p>지금 나영 님을 돕는 세 명이에요.</p>
+      </div>
+      <div class="staff-list" id="staffList"></div>
+      <div class="card note-card">
+        <h3>이렇게 일해요</h3>
+        <ul class="note-list">
+          <li><strong>귤이</strong>는 상주 — 감시·예약·응모·임시저장까지 직접 실행하고 결과를 보고해요.</li>
+          <li><strong>클로드</strong>는 수동 호출 — 코드·API처럼 깊게 파야 할 일을 맡아요.</li>
+          <li><strong>지피티</strong>는 수동 호출 — 주제·구성·초안을 넓게 뽑아요.</li>
+          <li>결제와 발행, 다른 사람에게 가는 연락은 나영 님이 직접 결정해요.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ═══ 메모 ═══ -->
+    <section class="panel" id="panel-memo" role="tabpanel" aria-labelledby="tabbtn-memo" hidden>
+      <div class="work-head">
+        <h2>메모</h2>
+        <p>지시사항을 적어두면 이 브라우저에 저장돼요. 노션에 붙여넣기 좋은 모양으로도 뽑을 수 있어요.</p>
+      </div>
+
+      <div class="memo-form card">
+        <textarea id="memoInput" rows="3" placeholder="예) 11/28 오전엔 티켓베이 대신 카카오만 봐줘" aria-label="메모 입력"></textarea>
+        <div class="memo-form-actions">
+          <button class="btn btn-primary" type="button" id="memoSave">메모 저장</button>
+          <button class="btn btn-ghost" type="button" id="memoCopyAll">전체 복사</button>
+          <button class="btn btn-ghost" type="button" id="memoExport">파일로 내보내기</button>
+        </div>
+      </div>
+
+      <div class="memo-list" id="memoList"></div>
+      <p class="empty" id="memoEmpty" hidden>아직 적어둔 메모가 없어요.</p>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>나영 비서실 · 로컬 대시보드</p>
+    <p class="footer-sub" id="footerUpdated"></p>
+  </footer>
+  
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="data/status.embed.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
