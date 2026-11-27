@@ -109,8 +109,12 @@
     return ok;
   }
 
+  var EXTRA_PEOPLE = {
+    gami: { name: '감이', role: '두 번째 피클', emoji: '🟠', bg: '#FFE3C2' },
+    bot: { name: '연동', role: '자동 기록', emoji: '🤖', bg: '#E8E8EE' }
+  };
   function person(id) {
-    return (DATA && DATA.people && DATA.people[id]) || { name: id, role: '', emoji: '🙂', bg: '#F3E7D8' };
+    return (DATA && DATA.people && DATA.people[id]) || EXTRA_PEOPLE[id] || { name: id, role: '', emoji: '🙂', bg: '#F3E7D8' };
   }
 
   /* ── load ──────────────────────────────── */
@@ -268,20 +272,28 @@
   function renderRoomChips() {
     var wrap = $('#roomChips');
     if (!wrap) return;
-    var rooms = (DATA.rooms || []).filter(function (r) { return r.id !== 'office'; });
+    var rooms = LIVE.rooms.map(function (r) { return { id: 'n:' + r.id, name: r.title.replace(/^[^\w가-힣]+/, ''), emoji: '💬', live: true }; })
+      .concat((DATA.rooms || []).filter(function (r) { return r.id !== 'office'; }));
     wrap.innerHTML = rooms.map(function (r) {
       return '<button class="room-chip' + (r.id === state.room ? ' is-active' : '') + '" type="button" data-room="' + esc(r.id) + '">' +
         '<span aria-hidden="true">' + esc(r.emoji) + '</span> ' + esc(r.name) + '</button>';
     }).join('');
 
-    var room = (DATA.rooms || []).filter(function (r) { return r.id === state.room; })[0] || rooms[0];
+    var room = rooms.filter(function (r) { return r.id === state.room; })[0] || rooms[0];
     var status = $('#roomStatus');
     if (status && room) {
-      status.textContent = room.emoji + ' ' + room.name + ' · ON ' + (ROOM_ON[room.id] || 3) + '명';
+      status.textContent = room.live
+        ? room.emoji + ' ' + room.name + ' · 노션 실시간' + (LIVE.at ? ' · ' + LIVE.at : '')
+        : room.emoji + ' ' + room.name + ' · ON ' + (ROOM_ON[room.id] || 3) + '명';
     }
+    var hint = $('#chatHint');
+    if (hint) hint.textContent = isLiveRoom()
+      ? '이 방은 노션 대화방과 연결돼 있어요 · 보내면 귤이·클로드가 바로 읽어요 · 30초마다 새 말 확인'
+      : '말풍선은 이 브라우저에만 저장 · 실제 지시는 복사해서 귤이에게 보내세요.';
   }
 
   function getMessages(roomId) {
+    if (/^n:/.test(roomId)) return (LIVE.msgs[roomId.slice(2)] || []);
     var saved = safeGet(KEY.chat + roomId, null);
     if (Array.isArray(saved)) return saved;
     return (DATA.chatSeeds && DATA.chatSeeds[roomId]) ? DATA.chatSeeds[roomId].slice() : [];
@@ -319,6 +331,7 @@
   }
 
   function saveMessage(from, text) {
+    if (isLiveRoom()) return sendLive(text);
     var msgs = getMessages(state.room);
     msgs.push({ from: from, text: text, time: nowTimeLabel() });
     safeSet(KEY.chat + state.room, msgs);
@@ -483,7 +496,8 @@
 
     if (tab === 'meeting') {
       renderRoomChips();
-      renderChat();
+      renderChat(true);
+      if (isLiveRoom()) loadLiveMessages(true);
       fitChatPanel();
       requestAnimationFrame(fitChatPanel);
     }
@@ -495,7 +509,8 @@
     state.room = roomId;
     safeSet(KEY.room, roomId);
     renderRoomChips();
-    renderChat();
+    renderChat(true);
+    if (isLiveRoom()) loadLiveMessages(true);
   }
 
   /* ── events ────────────────────────────── */
@@ -599,10 +614,11 @@
         var input = $('#chatInput');
         var text = input ? input.value.trim() : '';
         if (!text) { toast('남길 말을 적어 주세요'); return; }
+        var live = isLiveRoom();
         saveMessage(state.sender, text);
         input.value = '';
         input.style.height = '';
-        toast('말풍선에 남겼어요 (이 브라우저에만 저장)');
+        if (!live) toast('말풍선에 남겼어요 (이 브라우저에만 저장)');
       });
     }
 
@@ -1104,6 +1120,72 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) loadInbox(true); });
   }
 
+  /* ── 회의실 실시간: 노션 '회의' 페이지 댓글 (중계 서버 /api/chat) ── */
+  var LIVE = { rooms: [], msgs: {}, at: '', timer: null };
+  function isLiveRoom() { return /^n:/.test(state.room || ''); }
+  function hhmm(iso) {
+    try { var d = new Date(iso); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); } catch (e) { return ''; }
+  }
+  function stripTag(t) { return String(t || '').replace(/^\s*\[[^\]]{1,12}\]\s*/, ''); }
+
+  function loadLiveRooms() {
+    if (!relay()) return Promise.resolve();
+    return relayFetch('/api/chat').then(function (j) {
+      LIVE.rooms = j.rooms || [];
+      var ids = LIVE.rooms.map(function (r) { return 'n:' + r.id; });
+      /* 처음이거나(저장된 방이 기본 지휘실) 저장된 노션 방이 사라졌으면 → 귤이 대화방으로 */
+      var stale = isLiveRoom() && ids.indexOf(state.room) < 0;
+      if (ids.length && (stale || state.room === 'command')) {
+        var pick = LIVE.rooms.filter(function (r) { return /귤이/.test(r.title); })[0] || LIVE.rooms[0];
+        state.room = 'n:' + pick.id;
+      } else if (stale) state.room = 'command';
+      renderRoomChips();
+      if (isLiveRoom()) return loadLiveMessages(true);
+      renderChat();
+    }).catch(function () { /* 중계 서버 없으면 기존 말풍선만 */ });
+  }
+
+  function loadLiveMessages(toBottom) {
+    if (!isLiveRoom()) return Promise.resolve();
+    var id = state.room.slice(2);
+    return relayFetch('/api/chat?room=' + encodeURIComponent(id)).then(function (j) {
+      var before = (LIVE.msgs[id] || []).length;
+      LIVE.msgs[id] = (j.messages || []).map(function (m) {
+        return { from: m.from, text: stripTag(m.text), time: hhmm(m.at) };
+      });
+      LIVE.at = nowTimeLabel();
+      if (state.room === 'n:' + id) {
+        renderRoomChips();
+        renderChat(toBottom || LIVE.msgs[id].length !== before);
+      }
+    }).catch(function () { toast('대화방을 불러오지 못했어요'); });
+  }
+
+  function sendLive(text) {
+    var id = state.room.slice(2);
+    var btn = $('#sendBtn'); if (btn) btn.disabled = true;
+    (LIVE.msgs[id] = LIVE.msgs[id] || []).push({ from: 'nayeong', text: text, time: '보내는 중' });
+    renderChat(true);
+    return relayFetch('/api/chat', { method: 'POST', body: { room: id, text: text } }).then(function () {
+      toast('노션 대화방에 보냈어요');
+      return loadLiveMessages(true);
+    }).catch(function () {
+      LIVE.msgs[id].pop(); renderChat(true);
+      toast('보내지 못했어요 — 잠시 후 다시');
+      var input = $('#chatInput'); if (input && !input.value) input.value = text;
+    }).then(function () { if (btn) btn.disabled = false; });
+  }
+
+  function initLiveChat() {
+    loadLiveRooms();
+    LIVE.timer = setInterval(function () {
+      if (!document.hidden && state.tab === 'meeting' && isLiveRoom()) loadLiveMessages(false);
+    }, 30000);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && state.tab === 'meeting' && isLiveRoom()) loadLiveMessages(false);
+    });
+  }
+
   /* ── boot ──────────────────────────────── */
   function boot(data) {
     if (!data) {
@@ -1138,6 +1220,7 @@
     renderMemos();
     bindEvents();
     initInbox();
+    initLiveChat();
     setTab(state.tab, { hash: false });
   }
 
