@@ -1312,3 +1312,33 @@ body.locked { overflow: hidden; }
 .inbox-new form { display: grid; gap: 8px; margin-top: 10px; }
 .inbox-new input, .inbox-new select, .inbox-new textarea { font-family: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: #fffaf3; color: #3d2a1c; width: 100%; box-sizing: border-box; }
 .inbox-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* ── 회의실 개선 (11/27): 칩·상태줄 잘림 방지, 실시간 방 입력창 단순화 ── */
+#panel-meeting .room-chips,
+#panel-meeting .room-status,
+#panel-meeting .composer { flex-shrink: 0; }
+#panel-meeting .room-chips { padding: 8px 2px 6px; margin: 0 -2px; }
+.room-chip { max-width: 72vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.room-chip.is-live { border-color: #cfe3c8; }
+.live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #34d17a; box-shadow: 0 0 0 2px #d9f3e2; margin-left: 4px; }
+.room-status { margin: 4px 2px 10px; padding-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-status a { color: #8a5a2e; font-weight: 800; text-decoration: none; }
+.rs-live { display: inline-flex; align-items: center; gap: 4px; color: #2f8a55; font-weight: 800; }
+.rs-live .live-dot { margin: 0 2px 0 0; }
+#panel-meeting.is-live .composer-row:first-child,
+#panel-meeting.is-live #copyCmdBtn,
+#panel-meeting.is-live #notionBtn { display: none; }
+#panel-meeting.is-live #sendBtn {
+  background: linear-gradient(170deg, #9a6431, #7a4c23); color: #fff8ee; border-color: #7a4c23;
+  box-shadow: 0 6px 14px rgba(124, 78, 36, 0.24);
+}
+.composer-hint { white-space: normal; }
+.bubble-link { color: #8a5a2e; font-weight: 800; text-decoration: underline; }
+.st-tag { display: inline-block; font-size: 10.5px; font-weight: 800; line-height: 1; padding: 4px 7px; border-radius: 999px; margin: 0 2px; vertical-align: 1px; background: #f2e6d6; color: #6a5540; }
+.st-ask { background: #fde3d6; color: #a2482a; }
+.st-ack { background: #e3eefb; color: #2f5f9a; }
+.st-run { background: #efe4fb; color: #6a3fa0; }
+.st-done { background: #dcf3e4; color: #23784a; }
+.st-block { background: #fbdada; color: #a12d2d; }
+.st-q { background: #fff1c9; color: #8a6510; }
+#tabbtn-meeting { position: relative; }

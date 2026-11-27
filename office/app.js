@@ -40,8 +40,12 @@
       .replace(/'/g, '&#39;');
   }
 
+  var TAG_CLS = { '지시': 'ask', '받음': 'ack', '진행': 'run', '완료': 'done', '막힘': 'block', '질문': 'q', '안내': 'info' };
   function linkifyMentions(escaped) {
-    return escaped.replace(/@([가-힣A-Za-z0-9_]+|all)/g, '<span class="mention">@$1</span>');
+    return escaped
+      .replace(/(https?:\/\/[^\s<]+[^\s<.,)\]])/g, '<a class="bubble-link" href="$1" target="_blank" rel="noopener">링크 ↗</a>')
+      .replace(/@([가-힣A-Za-z0-9_]+|all)/g, '<span class="mention">@$1</span>')
+      .replace(/\[(지시|받음|진행|완료|막힘|질문|안내)\]/g, function (m, t) { return '<span class="st-tag st-' + TAG_CLS[t] + '">' + t + '</span>'; });
   }
 
   function safeGet(key, fallback) {
@@ -272,24 +276,39 @@
   function renderRoomChips() {
     var wrap = $('#roomChips');
     if (!wrap) return;
-    var rooms = LIVE.rooms.map(function (r) { return { id: 'n:' + r.id, name: r.title.replace(/^[^\w가-힣]+/, ''), emoji: '💬', live: true }; })
+    var rooms = LIVE.rooms.map(function (r) {
+      var t = r.title.replace(/^[^\w가-힣]+/, '');
+      var short = t.split(/\s+—\s+|\s+\(/)[0];
+      return { id: 'n:' + r.id, name: short, full: t, url: r.url, emoji: /대화방/.test(t) ? '💬' : '📋', live: true };
+    })
       .concat((DATA.rooms || []).filter(function (r) { return r.id !== 'office'; }));
     wrap.innerHTML = rooms.map(function (r) {
-      return '<button class="room-chip' + (r.id === state.room ? ' is-active' : '') + '" type="button" data-room="' + esc(r.id) + '">' +
-        '<span aria-hidden="true">' + esc(r.emoji) + '</span> ' + esc(r.name) + '</button>';
+      return '<button class="room-chip' + (r.id === state.room ? ' is-active' : '') + (r.live ? ' is-live' : '') + '" type="button" data-room="' + esc(r.id) + '" title="' + esc(r.full || r.name) + '">' +
+        '<span aria-hidden="true">' + esc(r.emoji) + '</span> ' + esc(r.name) + (r.live ? '<i class="live-dot" aria-label="실시간"></i>' : '') + '</button>';
     }).join('');
 
     var room = rooms.filter(function (r) { return r.id === state.room; })[0] || rooms[0];
     var status = $('#roomStatus');
     if (status && room) {
-      status.textContent = room.live
-        ? room.emoji + ' ' + room.name + ' · 노션 실시간' + (LIVE.at ? ' · ' + LIVE.at : '')
-        : room.emoji + ' ' + room.name + ' · ON ' + (ROOM_ON[room.id] || 3) + '명';
+      if (room.live) {
+        status.innerHTML = '<span class="rs-live"><i class="live-dot"></i>노션 연결</span> ' + esc(room.full || room.name) +
+          (LIVE.at ? ' · ' + esc(LIVE.at) + ' 갱신' : '') +
+          (room.url ? ' · <a href="' + esc(room.url) + '" target="_blank" rel="noopener">노션 ↗</a>' : '');
+      } else {
+        status.textContent = room.emoji + ' ' + room.name + ' · 이 브라우저 메모용 방';
+      }
     }
+    var live = isLiveRoom();
+    var panel = document.getElementById('panel-meeting');
+    if (panel) panel.classList.toggle('is-live', live);
+    var sendBtn = $('#sendBtn');
+    if (sendBtn) sendBtn.textContent = live ? '보내기' : '말풍선에 남기기';
+    var input = $('#chatInput');
+    if (input) input.placeholder = live ? '귤이·클로드에게 보낼 말 — 예) @귤이 원본 HTML 올려줘' : '이 브라우저에만 남길 메모 (실제 지시는 💬 대화방에서)';
     var hint = $('#chatHint');
-    if (hint) hint.textContent = isLiveRoom()
-      ? '이 방은 노션 대화방과 연결돼 있어요 · 보내면 귤이·클로드가 바로 읽어요 · 30초마다 새 말 확인'
-      : '말풍선은 이 브라우저에만 저장 · 실제 지시는 복사해서 귤이에게 보내세요.';
+    if (hint) hint.textContent = live
+      ? '보내면 노션 대화방에 [나영]으로 바로 올라가요 · 30초마다 새 말 확인'
+      : '이 방은 메모용이에요 · 비서에게 보내려면 💬 대화방을 고르세요';
   }
 
   function getMessages(roomId) {
@@ -1154,11 +1173,27 @@
         return { from: m.from, text: stripTag(m.text), time: hhmm(m.at) };
       });
       LIVE.at = nowTimeLabel();
+      var seenKey = 'ny-office:seen:' + id;
+      var last = LIVE.msgs[id].length ? (j.messages[j.messages.length - 1].at || '') : '';
+      if (state.tab === 'meeting' && !document.hidden) { safeSet(seenKey, last); meetBadge(0); }
+      else {
+        var seen = safeGet(seenKey, '');
+        meetBadge((j.messages || []).filter(function (m) { return m.at > seen && m.from !== 'nayeong'; }).length);
+      }
       if (state.room === 'n:' + id) {
         renderRoomChips();
         renderChat(toBottom || LIVE.msgs[id].length !== before);
       }
     }).catch(function () { toast('대화방을 불러오지 못했어요'); });
+  }
+
+  function meetBadge(n) {
+    var btn = document.getElementById('tabbtn-meeting');
+    if (!btn) return;
+    var b = btn.querySelector('.tab-badge');
+    if (!b) { b = document.createElement('span'); b.className = 'tab-badge'; btn.appendChild(b); }
+    b.textContent = n ? String(n > 9 ? '9+' : n) : '';
+    b.hidden = !n;
   }
 
   function sendLive(text) {
@@ -1178,8 +1213,11 @@
 
   function initLiveChat() {
     loadLiveRooms();
+    var tick = 0;
     LIVE.timer = setInterval(function () {
-      if (!document.hidden && state.tab === 'meeting' && isLiveRoom()) loadLiveMessages(false);
+      tick++;
+      if (document.hidden || !isLiveRoom()) return;
+      if (state.tab === 'meeting' || tick % 2 === 0) loadLiveMessages(false);
     }, 30000);
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden && state.tab === 'meeting' && isLiveRoom()) loadLiveMessages(false);
