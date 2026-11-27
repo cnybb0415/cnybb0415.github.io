@@ -1342,3 +1342,12 @@ body.locked { overflow: hidden; }
 .st-block { background: #fbdada; color: #a12d2d; }
 .st-q { background: #fff1c9; color: #8a6510; }
 #tabbtn-meeting { position: relative; }
+
+#panel-meeting { position: relative; }
+.new-msg-pill {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 190px; z-index: 5;
+  font-family: inherit; font-size: 12px; font-weight: 800; color: #fff8ee;
+  background: linear-gradient(170deg, #9a6431, #7a4c23); border: 0; border-radius: 999px;
+  padding: 8px 14px; box-shadow: 0 6px 14px rgba(124, 78, 36, 0.3); cursor: pointer;
+}
+#panel-meeting:not(.is-live) .new-msg-pill { bottom: 230px; }

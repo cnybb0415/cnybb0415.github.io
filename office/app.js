@@ -342,8 +342,28 @@
       '</div>';
     }).join('');
 
-    if (html !== list.__html) { list.innerHTML = html; list.__html = html; }
-    list.scrollTop = (toBottom || nearBottom) ? list.scrollHeight : keepTop;
+    var changed = html !== list.__html;
+    if (changed) { list.innerHTML = html; list.__html = html; }
+    var stick = toBottom || nearBottom;
+    list.scrollTop = stick ? list.scrollHeight : keepTop;
+    newMsgPill(changed && !stick && msgs.length > 0);
+  }
+
+  /* 위를 읽는 중에 새 말이 오면 '새 말 ↓' 버튼으로만 알려요 (자동으로 끌어내리지 않음) */
+  function newMsgPill(show) {
+    var list = $('#chatList');
+    var pill = document.getElementById('newMsgPill');
+    if (!pill && list) {
+      pill = document.createElement('button');
+      pill.id = 'newMsgPill'; pill.type = 'button'; pill.className = 'new-msg-pill'; pill.textContent = '새 말 ↓';
+      pill.hidden = true;
+      list.parentNode.insertBefore(pill, list.nextSibling);
+      pill.addEventListener('click', function () { list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' }); pill.hidden = true; });
+      list.addEventListener('scroll', function () {
+        if (list.scrollHeight - list.scrollTop - list.clientHeight < 80) pill.hidden = true;
+      }, { passive: true });
+    }
+    if (pill && show) pill.hidden = false;
   }
 
   function fitChatPanel() {
