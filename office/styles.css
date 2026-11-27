@@ -1283,3 +1283,32 @@ body.locked { overflow: hidden; }
   cursor: pointer;
 }
 .lock.is-wrong .lock-pass-input { border-color: #cf6248; }
+
+/* ── 할 일함 ── */
+.tab { position: relative; }
+.tab-badge { position: absolute; top: 4px; right: 18%; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #cf6248; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; }
+.inbox-card { padding: 16px; margin: 14px 0 6px; }
+.inbox-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.inbox-head h2 { margin: 0; font-size: 16px; }
+.inbox-head small { font-size: 10.5px; color: var(--muted); font-weight: 600; margin-left: 4px; }
+.inbox-desc { margin: 6px 0 12px; font-size: 11.5px; color: var(--muted); }
+.inbox-empty { font-size: 12.5px; color: var(--muted); margin: 8px 0; }
+.inbox-list { display: grid; gap: 10px; }
+.ib-item { background: #fffaf3; border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+.ib-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; }
+.ib-status { padding: 2px 8px; border-radius: 999px; background: #efe3d2; color: #6f4a28; }
+.ib-need { background: #fde2dc; color: #a43f2a; }
+.ib-ok { background: #e6efd9; color: #4d6b2a; }
+.ib-run { background: #ece1f6; color: #5b3b80; }
+.ib-pri { color: #a4572b; }
+.ib-kind { color: var(--muted); }
+.ib-title { margin: 6px 0 2px; font-size: 13.5px; font-weight: 800; color: #3d2a1c; }
+.ib-result, .ib-due { margin: 2px 0; font-size: 11.5px; color: #7a5f47; }
+.ib-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ib-btn { font-family: inherit; font-size: 11.5px; font-weight: 700; color: #6f4a28; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; cursor: pointer; text-decoration: none; }
+.ib-btn.ib-ok { background: linear-gradient(170deg, #9a6431, #7c4e24); color: #fffaf3; border-color: transparent; }
+.inbox-new { margin-top: 12px; }
+.inbox-new summary { cursor: pointer; font-size: 12.5px; font-weight: 800; color: #6f4a28; }
+.inbox-new form { display: grid; gap: 8px; margin-top: 10px; }
+.inbox-new input, .inbox-new select, .inbox-new textarea { font-family: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: #fffaf3; color: #3d2a1c; width: 100%; box-sizing: border-box; }
+.inbox-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

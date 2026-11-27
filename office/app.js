@@ -960,6 +960,150 @@
     });
   }
 
+  /* ── 할 일함: 대시보드 ↔ 노션 AI 회사 DB (중계 서버 경유) ── */
+  var INBOX = { items: [], busy: false, at: null };
+  function relay() { return (DATA && DATA.relay) || null; }
+
+  function relayFetch(path, opts) {
+    var r = relay();
+    if (!r || !r.base || !r.token) return Promise.reject(new Error('relay'));
+    opts = opts || {};
+    return fetch(r.base + path, {
+      method: opts.method || 'GET',
+      headers: { 'Authorization': 'Bearer ' + r.token, 'Content-Type': 'application/json' },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      cache: 'no-store'
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (j) {
+        if (!res.ok) { var e = new Error(j.error || ('HTTP ' + res.status)); e.status = res.status; throw e; }
+        return j;
+      });
+    });
+  }
+
+  var STATUS_ORDER = { '확인 필요': 0, '승인됨': 1, '진행 중': 2, '대기': 3 };
+  var STATUS_CLS = { '확인 필요': 'need', '승인됨': 'ok', '진행 중': 'run', '대기': 'wait' };
+
+  function inboxBadge() {
+    var n = INBOX.items.filter(function (i) { return i.status === '확인 필요'; }).length;
+    var btn = document.getElementById('tabbtn-work');
+    if (!btn) return;
+    var b = btn.querySelector('.tab-badge');
+    if (!b) { b = document.createElement('span'); b.className = 'tab-badge'; btn.appendChild(b); }
+    b.textContent = n ? String(n) : '';
+    b.hidden = !n;
+  }
+
+  function renderInbox() {
+    var box = $('#inboxList');
+    if (!box) return;
+    var meta = $('#inboxMeta');
+    if (!relay()) {
+      box.innerHTML = '<p class="inbox-empty">아직 중계 서버가 연결되지 않았어요.</p>';
+      return;
+    }
+    if (meta) meta.textContent = INBOX.at ? ('업데이트 ' + new Date(INBOX.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })) : '';
+    var items = INBOX.items.slice().sort(function (a, b) {
+      return (STATUS_ORDER[a.status] || 9) - (STATUS_ORDER[b.status] || 9);
+    });
+    if (!items.length) { box.innerHTML = '<p class="inbox-empty">쌓인 일이 없어요 🎉</p>'; inboxBadge(); return; }
+    box.innerHTML = items.map(function (it) {
+      var who = (it.assignees || []).join('·') || '담당 없음';
+      var acts = '';
+      if (it.status === '확인 필요') {
+        acts = '<button class="ib-btn ib-ok" data-act="approve" type="button">✅ 승인</button>' +
+               '<button class="ib-btn" data-act="reject" type="button">반려</button>';
+      } else if (it.status === '대기' || it.status === '진행 중') {
+        acts = '<button class="ib-btn" data-act="done" type="button">☑ 끝났어요</button>';
+      }
+      acts += '<button class="ib-btn" data-act="comment" type="button">💬 한마디</button>' +
+              '<a class="ib-btn ib-link" href="' + esc(it.url) + '" target="_blank" rel="noopener noreferrer">노션</a>';
+      return '<article class="ib-item" data-id="' + esc(it.id) + '">' +
+        '<div class="ib-top"><span class="ib-status ib-' + (STATUS_CLS[it.status] || 'wait') + '">' + esc(it.status) + '</span>' +
+        (it.priority ? '<span class="ib-pri">' + esc(it.priority) + '</span>' : '') +
+        '<span class="ib-kind">' + esc(it.kind) + ' · ' + esc(who) + '</span></div>' +
+        '<h3 class="ib-title">' + esc(it.title || '(제목 없음)') + '</h3>' +
+        (it.result ? '<p class="ib-result">' + esc(it.result) + '</p>' : '') +
+        (it.due ? '<p class="ib-due">마감 ' + esc(String(it.due).slice(0, 16).replace('T', ' ')) + '</p>' : '') +
+        '<div class="ib-acts">' + acts + '</div></article>';
+    }).join('');
+    inboxBadge();
+  }
+
+  function loadInbox(quiet) {
+    if (!relay() || INBOX.busy) { renderInbox(); return; }
+    INBOX.busy = true;
+    var box = $('#inboxList');
+    if (box && !quiet && !INBOX.items.length) box.innerHTML = '<p class="inbox-empty">불러오는 중…</p>';
+    relayFetch('/api/queue').then(function (j) {
+      INBOX.items = j.items || [];
+      INBOX.at = j.at || new Date().toISOString();
+      renderInbox();
+    }).catch(function (e) {
+      if (box) box.innerHTML = '<p class="inbox-empty">' + (e.status === 503 ? '중계 서버에 노션 연결이 아직 안 됐어요.' : '할 일함을 불러오지 못했어요. 잠시 후 다시 눌러 주세요.') + '</p>';
+    }).then(function () { INBOX.busy = false; });
+  }
+
+  function doAction(id, act) {
+    var note = '';
+    if (act === 'comment') {
+      note = window.prompt('비서들에게 남길 말');
+      if (!note) return;
+    } else if (act === 'reject') {
+      note = window.prompt('반려 이유 (선택)') || '';
+    } else if (act === 'approve') {
+      note = window.prompt('승인 메모 (선택, 비워도 돼요)') || '';
+    }
+    relayFetch('/api/action', { method: 'POST', body: { id: id, action: act, note: note } }).then(function (j) {
+      var i = INBOX.items.findIndex(function (x) { return x.id === id; });
+      if (j.item && i >= 0) {
+        if (['대기', '진행 중', '확인 필요', '승인됨'].indexOf(j.item.status) >= 0) INBOX.items[i] = j.item;
+        else INBOX.items.splice(i, 1);
+      }
+      renderInbox();
+      toast({ approve: '승인했어요. 담당 비서가 다음 차례에 마무리해요', reject: '반려했어요', done: '완료로 표시했어요', comment: '노션에 남겼어요', reopen: '다시 요청했어요' }[act] || '반영했어요');
+    }).catch(function () { toast('반영하지 못했어요. 다시 시도해 주세요'); });
+  }
+
+  function submitRequest(e) {
+    e.preventDefault();
+    var f = e.target;
+    var body = {
+      title: f.querySelector('[name=title]').value,
+      assignee: f.querySelector('[name=assignee]').value,
+      priority: f.querySelector('[name=priority]').value,
+      body: f.querySelector('[name=body]').value
+    };
+    if (!body.title.trim()) { toast('무엇을 할지 한 줄로 적어 주세요'); return; }
+    var btn = f.querySelector('button[type=submit]');
+    btn.disabled = true;
+    relayFetch('/api/request', { method: 'POST', body: body }).then(function (j) {
+      if (j.item) INBOX.items.unshift(j.item);
+      f.reset();
+      renderInbox();
+      toast(body.assignee + '에게 요청했어요');
+    }).catch(function () { toast('요청을 보내지 못했어요'); }).then(function () { btn.disabled = false; });
+  }
+
+  function initInbox() {
+    var list = $('#inboxList');
+    if (!list || list.getAttribute('data-ready')) return;
+    list.setAttribute('data-ready', '1');
+    list.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]');
+      if (!b) return;
+      var card = b.closest('[data-id]');
+      if (card) doAction(card.getAttribute('data-id'), b.getAttribute('data-act'));
+    });
+    var form = $('#inboxForm');
+    if (form) form.addEventListener('submit', submitRequest);
+    var re = $('#inboxRefresh');
+    if (re) re.addEventListener('click', function () { loadInbox(false); });
+    loadInbox(false);
+    setInterval(function () { if (!document.hidden && document.body.classList.contains('locked') === false) loadInbox(true); }, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) loadInbox(true); });
+  }
+
   /* ── boot ──────────────────────────────── */
   function boot(data) {
     if (!data) {
@@ -993,6 +1137,7 @@
     renderComposer();
     renderMemos();
     bindEvents();
+    initInbox();
     setTab(state.tab, { hash: false });
   }
 
