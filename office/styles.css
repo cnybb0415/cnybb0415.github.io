@@ -1240,3 +1240,46 @@ body.locked { overflow: hidden; }
   .lock-btn span { display: none; }
   .brand-text h1 { font-size: 17px; }
 }
+
+/* ── 열쇠 입력 (암호화 금고) ── */
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lock-pass { display: grid; gap: 10px; text-align: left; }
+.lock-pass-input {
+  font-family: inherit;
+  font-size: 16px; /* iOS 확대 방지 */
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fffaf3;
+  color: #3d2a1c;
+  width: 100%;
+  box-sizing: border-box;
+}
+.lock-pass-input:focus { outline: 2px solid #c58a4d; outline-offset: 1px; }
+.lock-remember { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.lock-remember input { width: 16px; height: 16px; accent-color: #9a6431; }
+.lock-pass-btn {
+  font-family: inherit;
+  height: 48px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fffaf3;
+  background: linear-gradient(170deg, #9a6431, #7c4e24);
+  border: 0;
+  border-radius: 16px;
+  cursor: pointer;
+}
+.lock-pass-btn:disabled { opacity: 0.6; cursor: wait; }
+.lock-forget {
+  margin-top: 12px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ab927a;
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.lock.is-wrong .lock-pass-input { border-color: #cf6248; }

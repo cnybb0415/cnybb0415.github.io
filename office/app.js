@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════
    나영 비서실 — app.js
-   데이터: data/status.json (없으면 data/status.embed.js)
+   데이터: data/status.enc.json (AES-GCM 암호문, 열쇠로만 열림)
    ═══════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -114,16 +114,6 @@
   }
 
   /* ── load ──────────────────────────────── */
-  function loadData() {
-    return fetch('data/status.json', { cache: 'no-store' })
-      .then(function (res) {
-        if (!res.ok) throw new Error('status.json ' + res.status);
-        return res.json();
-      })
-      .catch(function () {
-        return window.__STATUS__ || null;
-      });
-  }
 
   /* ── render: header / connections ──────── */
   function renderConnections() {
@@ -683,15 +673,35 @@
     });
   }
 
-  /* ── PIN 잠금 ──────────────────────────── */
-  var LOCK_KEY = 'ny-office:auth';
+  /* ── 잠금 (암호화 금고) ─────────────────────
+     현황 데이터는 data/status.enc.json에 AES-256-GCM으로 암호화돼 있습니다.
+     · 열쇠(비밀 문구)는 소스 어디에도 없고, PBKDF2-SHA256 60만 회로 키를 만듭니다.
+     · 이 기기 기억하기: 만든 키를 '꺼낼 수 없는' CryptoKey로 IndexedDB에만 둡니다.
+     · PIN은 그 기기 안에서 쓰는 빠른 잠금이며, PIN 확인값도 암호문 안에 들어 있습니다.
+     · PIN을 5번 틀리면 이 기기의 키를 지우고 열쇠를 다시 묻습니다.            */
   var PIN_LEN = 4;
-  /* PIN은 SHA-256 해시로만 비교합니다. 평문 코드는 소스에 두지 않습니다. */
-  var PIN_HASH = 'cc41d80b1697c04d19330fba23a82cfc68fb086e3445691578bfae3a3d6f3e57';
+  var PIN_MAX_FAIL = 5;
+  var SESSION_KEY = 'ny-office:session';
+  var FAIL_KEY = 'ny-office:pinfail';
+  var DB_NAME = 'ny-office-vault';
+  var DB_STORE = 'keys';
   var DEFAULT_LOCK_SUB = '4자리 PIN을 입력해 주세요';
+  var SEALED = null;      /* status.enc.json 내용 */
+  var OPENED = null;      /* 복호화된 현황 데이터 */
   var pinEntry = '';
   var pinBusy = false;
   var lockOnUnlock = null;
+
+  function hasCrypto() {
+    return !!(window.crypto && crypto.subtle && window.TextEncoder && window.indexedDB);
+  }
+
+  function b64ToBytes(s) {
+    var bin = atob(s);
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
 
   function bytesToHex(buf) {
     return Array.prototype.map.call(new Uint8Array(buf), function (b) {
@@ -699,81 +709,79 @@
     }).join('');
   }
 
-  function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }
+  /* IndexedDB: 꺼낼 수 없는 키만 저장 */
+  function idb() {
+    return new Promise(function (resolve, reject) {
+      var req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore(DB_STORE); };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+  function idbDo(mode, fn) {
+    return idb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(DB_STORE, mode);
+        var r = fn(tx.objectStore(DB_STORE));
+        tx.oncomplete = function () { resolve(r && r.result); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+  function loadDeviceKey() { return idbDo('readonly', function (s) { return s.get('k'); }).catch(function () { return null; }); }
+  function saveDeviceKey(key) { return idbDo('readwrite', function (s) { return s.put(key, 'k'); }); }
+  function dropDeviceKey() { return idbDo('readwrite', function (s) { return s.delete('k'); }).catch(function () {}); }
 
-  /* crypto.subtle이 없는 환경(비보안 컨텍스트)을 위한 SHA-256 폴백 */
-  function sha256Hex(str) {
-    var K = [
-      0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-      0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-      0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-      0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-      0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-      0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-      0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-      0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
-    ];
-    var H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
-    var bytes = unescape(encodeURIComponent(String(str)));
-    var len = bytes.length;
-    var words = [];
-    var i;
-    for (i = 0; i < len; i++) {
-      words[i >> 2] = (words[i >> 2] | 0) | ((bytes.charCodeAt(i) & 0xff) << (24 - (i % 4) * 8));
-    }
-    words[len >> 2] = (words[len >> 2] | 0) | (0x80 << (24 - (len % 4) * 8));
-    var total = (((len + 8) >> 6) + 1) << 4;
-    words[total - 1] = len * 8;
-
-    for (var j = 0; j < total; j += 16) {
-      var w = new Array(64);
-      var a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
-      for (i = 0; i < 64; i++) {
-        if (i < 16) {
-          w[i] = words[j + i] | 0;
-        } else {
-          var s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
-          var s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
-          w[i] = (((w[i - 16] + s0) | 0) + ((w[i - 7] + s1) | 0)) | 0;
-        }
-        var S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
-        var ch = (e & f) ^ (~e & g);
-        var t1 = (h + S1 + ch + K[i] + w[i]) | 0;
-        var S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
-        var maj = (a & b) ^ (a & c) ^ (b & c);
-        var t2 = (S0 + maj) | 0;
-        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
-      }
-      H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
-      H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
-    }
-    return H.map(function (x) { return ('00000000' + (x >>> 0).toString(16)).slice(-8); }).join('');
+  function fetchSealed() {
+    if (SEALED) return Promise.resolve(SEALED);
+    return fetch('data/status.enc.json', { cache: 'no-store' }).then(function (res) {
+      if (!res.ok) throw new Error('status.enc.json ' + res.status);
+      return res.json();
+    }).then(function (j) { SEALED = j; return j; });
   }
 
-  function pinHash(text) {
-    if (window.crypto && crypto.subtle && crypto.subtle.digest && window.TextEncoder) {
-      try {
-        return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
-          .then(bytesToHex)
-          .catch(function () { return sha256Hex(text); });
-      } catch (e) { /* 폴백으로 진행 */ }
-    }
-    return Promise.resolve(sha256Hex(text));
+  function deriveKey(pass, sealed) {
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey('raw', enc.encode(pass.normalize('NFC')), 'PBKDF2', false, ['deriveKey'])
+      .then(function (base) {
+        return crypto.subtle.deriveKey(
+          { name: 'PBKDF2', hash: 'SHA-256', salt: b64ToBytes(sealed.salt), iterations: sealed.iter },
+          base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+      });
+  }
+
+  function openSealed(key, sealed) {
+    return crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: b64ToBytes(sealed.iv), additionalData: new TextEncoder().encode('ny-office:v' + sealed.v) },
+      key, b64ToBytes(sealed.ct)
+    ).then(function (buf) { return JSON.parse(new TextDecoder().decode(buf)); });
+  }
+
+  function pinOk(pin) {
+    var sec = (OPENED && OPENED.security) || {};
+    if (!sec.pinHash || !sec.pinSalt) return Promise.resolve(false);
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(sec.pinSalt + ':' + pin))
+      .then(function (h) { return bytesToHex(h) === sec.pinHash; });
+  }
+
+  function failCount() { var n = parseInt(safeGet(FAIL_KEY, 0), 10); return isNaN(n) ? 0 : n; }
+  function setFail(n) { if (n) safeSet(FAIL_KEY, n); else { try { localStorage.removeItem(FAIL_KEY); } catch (e) {} } }
+  function sessionOn() { try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch (e) { return false; } }
+  function setSession(on) {
+    try { if (on) sessionStorage.setItem(SESSION_KEY, '1'); else sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+    document.documentElement.classList.toggle('is-authed', !!on);
   }
 
   function lockOverlay() { return document.getElementById('lockScreen'); }
-
   function lockSub(text) {
     var el = document.getElementById('lockSub');
     if (el) el.textContent = text || DEFAULT_LOCK_SUB;
   }
-
   function paintDots() {
     $all('#lockDots .lock-dot').forEach(function (dot, idx) {
       dot.classList.toggle('on', idx < pinEntry.length);
     });
   }
-
   function shakeLock() {
     var el = lockOverlay();
     if (!el) return;
@@ -781,31 +789,23 @@
     setTimeout(function () { el.classList.remove('is-wrong'); }, 460);
   }
 
-  function isAuthed() {
-    try { return localStorage.getItem(LOCK_KEY) === 'ok'; } catch (e) { return false; }
-  }
-
-  function rememberAuthed() {
-    try { localStorage.setItem(LOCK_KEY, 'ok'); } catch (e) { /* 저장 실패해도 이번 세션은 통과 */ }
-    document.documentElement.classList.add('is-authed');
-  }
-
-  function forgetAuthed() {
-    try { localStorage.removeItem(LOCK_KEY); } catch (e) { /* noop */ }
-    document.documentElement.classList.remove('is-authed');
-  }
-
-  function showLock() {
+  /* mode: 'pass' = 열쇠 입력, 'pin' = PIN 입력 */
+  function showLock(mode, sub) {
     var el = lockOverlay();
     if (!el) return;
     pinEntry = '';
     pinBusy = false;
     paintDots();
-    lockSub(DEFAULT_LOCK_SUB);
+    el.setAttribute('data-mode', mode);
+    $('#lockPinArea').hidden = mode !== 'pin';
+    $('#lockPassForm').hidden = mode !== 'pass';
+    $('#lockForget').hidden = mode !== 'pin';
+    lockSub(sub || (mode === 'pass' ? '이 기기에서 처음이에요. 비서실 열쇠를 입력해 주세요' : DEFAULT_LOCK_SUB));
     el.removeAttribute('hidden');
     el.style.display = 'grid';
     el.classList.remove('is-wrong');
     document.body.classList.add('locked');
+    if (mode === 'pass') setTimeout(function () { var i = $('#lockPass'); if (i) i.focus(); }, 30);
   }
 
   function hideLock() {
@@ -816,34 +816,37 @@
     document.body.classList.remove('locked');
   }
 
-  function fireUnlock() {
-    var fn = lockOnUnlock;
-    lockOnUnlock = null;
-    if (fn) fn();
-  }
-
   function unlockNow() {
-    rememberAuthed();
+    setFail(0);
+    setSession(true);
     pinEntry = '';
     paintDots();
     hideLock();
-    fireUnlock();
+    var fn = lockOnUnlock;
+    lockOnUnlock = null;
+    if (fn) fn(OPENED);
   }
 
   function checkPin() {
     pinBusy = true;
     lockSub('확인 중…');
-    var entered = pinEntry;
-    pinHash(entered).then(function (hex) {
+    pinOk(pinEntry).then(function (ok) {
       pinBusy = false;
-      if (hex === PIN_HASH) {
-        unlockNow();
-        return;
-      }
+      if (ok) { unlockNow(); return; }
+      var n = failCount() + 1;
       pinEntry = '';
       paintDots();
       shakeLock();
-      lockSub('PIN이 맞지 않아요. 다시 입력해 주세요');
+      if (n >= PIN_MAX_FAIL) {
+        setFail(0);
+        OPENED = null;
+        dropDeviceKey().then(function () {
+          showLock('pass', 'PIN을 ' + PIN_MAX_FAIL + '번 틀려서 이 기기의 열쇠를 지웠어요. 열쇠를 다시 입력해 주세요');
+        });
+        return;
+      }
+      setFail(n);
+      lockSub('PIN이 맞지 않아요 (' + n + '/' + PIN_MAX_FAIL + ')');
     }).catch(function () {
       pinBusy = false;
       pinEntry = '';
@@ -869,9 +872,44 @@
     if (pinEntry.length === PIN_LEN) checkPin();
   }
 
+  function submitPass(e) {
+    e.preventDefault();
+    var input = $('#lockPass');
+    var remember = $('#lockRemember');
+    var pass = (input && input.value || '').trim();
+    if (!pass) return;
+    var btn = $('#lockPassBtn');
+    if (btn) btn.disabled = true;
+    lockSub('열쇠 확인 중… (몇 초 걸려요)');
+    fetchSealed().then(function (sealed) {
+      return deriveKey(pass, sealed).then(function (key) {
+        return openSealed(key, sealed).then(function (data) {
+          OPENED = data;
+          if (input) input.value = '';
+          return (remember && remember.checked) ? saveDeviceKey(key).catch(function () {}) : null;
+        });
+      });
+    }).then(function () {
+      if (btn) btn.disabled = false;
+      unlockNow();
+    }).catch(function () {
+      if (btn) btn.disabled = false;
+      shakeLock();
+      lockSub('열쇠가 맞지 않아요. 다시 확인해 주세요');
+    });
+  }
+
   function lockNow() {
-    forgetAuthed();
-    showLock();
+    setSession(false);
+    if (OPENED) showLock('pin');
+    else showLock('pass');
+  }
+
+  function forgetDevice() {
+    setSession(false);
+    setFail(0);
+    OPENED = null;
+    dropDeviceKey().then(function () { showLock('pass', '이 기기에서 열쇠를 지웠어요'); });
   }
 
   function initLock(onUnlock) {
@@ -884,21 +922,42 @@
         pressKey(btn.getAttribute('data-key'));
       });
     }
-
     document.addEventListener('keydown', function (e) {
       var el = lockOverlay();
-      if (!el || el.hasAttribute('hidden')) return;
+      if (!el || el.hasAttribute('hidden') || el.getAttribute('data-mode') !== 'pin') return;
       if (/^[0-9]$/.test(e.key)) { pressKey(e.key); e.preventDefault(); }
       else if (e.key === 'Backspace') { pressKey('del'); e.preventDefault(); }
     });
-
+    var form = $('#lockPassForm');
+    if (form) form.addEventListener('submit', submitPass);
+    var forget = $('#lockForget');
+    if (forget) forget.addEventListener('click', forgetDevice);
     var btn = document.getElementById('lockBtn');
     if (btn) btn.addEventListener('click', lockNow);
 
-    var authed = isAuthed();
-    if (authed) hideLock();
-    else showLock();
-    if (authed) fireUnlock();
+    if (!hasCrypto()) {
+      showLock('pass', '이 브라우저에서는 암호를 풀 수 없어요. https 주소로 최신 브라우저에서 열어 주세요');
+      $('#lockPassForm').hidden = true;
+      return;
+    }
+
+    Promise.all([fetchSealed(), loadDeviceKey()]).then(function (r) {
+      var sealed = r[0], key = r[1];
+      if (!key) { setSession(false); showLock('pass'); return; }
+      return openSealed(key, sealed).then(function (data) {
+        OPENED = data;
+        if (sessionOn()) unlockNow();
+        else showLock('pin');
+      }).catch(function () {
+        /* 데이터가 새 열쇠로 다시 잠긴 경우 */
+        dropDeviceKey();
+        setSession(false);
+        showLock('pass', '열쇠가 바뀌었어요. 새 열쇠를 입력해 주세요');
+      });
+    }).catch(function () {
+      setSession(false);
+      showLock('pass', '현황 데이터를 불러오지 못했어요. 잠시 후 다시 열어 주세요');
+    });
   }
 
   /* ── boot ──────────────────────────────── */
@@ -908,7 +967,7 @@
       if (main) {
         main.innerHTML = '<div class="card" style="padding:20px;margin-top:16px">' +
           '<h2 style="margin:0 0 6px;font-size:16px">현황 데이터를 불러오지 못했어요</h2>' +
-          '<p style="margin:0;font-size:12.5px;color:#8a6a4a">data/status.json 또는 data/status.embed.js가 같은 폴더에 있는지 확인해 주세요.</p></div>';
+          '<p style="margin:0;font-size:12.5px;color:#8a6a4a">잠시 후 다시 열어 주세요.</p></div>';
       }
       return;
     }
@@ -938,8 +997,6 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    initLock(function () {
-      loadData().then(boot).catch(function () { boot(null); });
-    });
+    initLock(function (data) { boot(data || null); });
   });
 })();
