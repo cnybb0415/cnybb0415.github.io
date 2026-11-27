@@ -322,8 +322,11 @@
     var list = $('#chatList');
     if (!list) return;
     var msgs = getMessages(state.room);
+    // 30초마다 새로 불러와도 읽던 자리를 지켜요: 바닥 근처에 있었으면 바닥으로, 위를 읽고 있었으면 그 자리 그대로
+    var nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+    var keepTop = list.scrollTop;
 
-    list.innerHTML = msgs.map(function (m) {
+    var html = msgs.map(function (m) {
       var p = person(m.from);
       var isMe = !!p.me;
       return '<div class="msg' + (isMe ? ' is-me' : '') + '">' +
@@ -339,7 +342,8 @@
       '</div>';
     }).join('');
 
-    list.scrollTop = toBottom ? list.scrollHeight : 0;
+    if (html !== list.__html) { list.innerHTML = html; list.__html = html; }
+    list.scrollTop = (toBottom || nearBottom) ? list.scrollHeight : keepTop;
   }
 
   function fitChatPanel() {
@@ -1168,7 +1172,6 @@
     if (!isLiveRoom()) return Promise.resolve();
     var id = state.room.slice(2);
     return relayFetch('/api/chat?room=' + encodeURIComponent(id)).then(function (j) {
-      var before = (LIVE.msgs[id] || []).length;
       LIVE.msgs[id] = (j.messages || []).map(function (m) {
         return { from: m.from, text: stripTag(m.text), time: hhmm(m.at) };
       });
@@ -1182,7 +1185,7 @@
       }
       if (state.room === 'n:' + id) {
         renderRoomChips();
-        renderChat(toBottom || LIVE.msgs[id].length !== before);
+        renderChat(toBottom);
       }
     }).catch(function () { toast('대화방을 불러오지 못했어요'); });
   }
