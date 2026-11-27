@@ -11,7 +11,7 @@
 <meta name="referrer" content="no-referrer" />
 <title>나영 비서실</title>
 <script>try{if(sessionStorage.getItem('ny-office:session')==='1')document.documentElement.classList.add('is-authed');}catch(e){}</script>
-<link rel="stylesheet" href="styles.css?v=20261127e" />
+<link rel="stylesheet" href="styles.css?v=20261128a" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%91%3C/text%3E%3C/svg%3E" />
 </head>
 <body>
@@ -86,6 +86,9 @@
       </button>
       <button class="tab" role="tab" id="tabbtn-staff" data-tab="staff" aria-selected="false" aria-controls="panel-staff" tabindex="-1">
         <span class="tab-emoji" aria-hidden="true">📊</span><span class="tab-label">비서현황</span>
+      </button>
+      <button class="tab" role="tab" id="tabbtn-report" data-tab="report" aria-selected="false" aria-controls="panel-report" tabindex="-1">
+        <span class="tab-emoji" aria-hidden="true">📑</span><span class="tab-label">보고</span>
       </button>
       <button class="tab" role="tab" id="tabbtn-memo" data-tab="memo" aria-selected="false" aria-controls="panel-memo" tabindex="-1">
         <span class="tab-emoji" aria-hidden="true">📝</span><span class="tab-label">메모</span>
@@ -221,6 +224,15 @@
     </section>
 
     <!-- ═══ 메모 ═══ -->
+    <!-- ═══ 보고 ═══ -->
+    <section class="panel" id="panel-report" role="tabpanel" aria-labelledby="tabbtn-report" hidden>
+      <div class="work-head">
+        <h2>보고함</h2>
+        <p>회의가 끝나면 클로드가 결론을 정리해 여기에 올려요. 노션 AI 회사의 '보고' 행이에요.</p>
+      </div>
+      <div class="report-list" id="reportList"><p class="empty">보고를 불러오는 중…</p></div>
+    </section>
+
     <section class="panel" id="panel-memo" role="tabpanel" aria-labelledby="tabbtn-memo" hidden>
       <div class="work-head">
         <h2>메모</h2>
@@ -251,6 +263,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="app.js?v=20261127e"></script>
+<script src="app.js?v=20261128a"></script>
 </body>
 </html>

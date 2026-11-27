@@ -13,7 +13,7 @@
     tab: 'ny-office:tab'
   };
 
-  var TABS = ['map', 'meeting', 'work', 'staff', 'memo'];
+  var TABS = ['map', 'meeting', 'work', 'staff', 'report', 'memo'];
   var ROOM_ON = { main: 3, command: 3, lounge: 2, office: 3 };
   var MENTION_LIST = ['@all', '@귤이', '@감이', '@클로드', '@지피티'];
   var SENDERS = ['nayeong', 'gyuri', 'claude', 'gpt'];
@@ -551,6 +551,7 @@
       requestAnimationFrame(fitChatPanel);
     }
     if (tab === 'work') renderTasks();
+    if (tab === 'report') { loadReports(); markReportsSeen(); }
     if (tab !== 'meeting') window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -1222,6 +1223,83 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) loadBoard(); });
   }
 
+  /* ── 보고함: 노션 '보고' 행 (중계 서버 /api/reports) ── */
+  var REPORTS = { items: [], open: {}, bodies: {} };
+  function reportBadge() {
+    var seen = safeGet('ny-office:reports-seen', '');
+    var n = REPORTS.items.filter(function (r) { return (r.created || '') > seen; }).length;
+    var btn = document.getElementById('tabbtn-report');
+    if (!btn) return;
+    var b = btn.querySelector('.tab-badge');
+    if (!b) { b = document.createElement('span'); b.className = 'tab-badge'; btn.appendChild(b); }
+    b.textContent = n ? String(n) : ''; b.hidden = !n;
+  }
+  function markReportsSeen() {
+    if (REPORTS.items.length) safeSet('ny-office:reports-seen', REPORTS.items[0].created || '');
+    reportBadge();
+  }
+  function renderReportBody(blocks) {
+    return blocks.map(function (b) {
+      if (b.t === 'h') return '<h4>' + esc(b.text) + '</h4>';
+      if (b.t === 'li') return '<p class="rp-li">• ' + linkifyMentions(esc(b.text)) + '</p>';
+      if (b.t === 'q') return '<p class="rp-q">' + esc(b.text) + '</p>';
+      if (b.t === 'table') {
+        return '<div class="rp-table"><table>' + b.rows.map(function (r, i) {
+          var tag = i === 0 ? 'th' : 'td';
+          return '<tr>' + r.map(function (c) { return '<' + tag + '>' + esc(c) + '</' + tag + '>'; }).join('') + '</tr>';
+        }).join('') + '</table></div>';
+      }
+      return '<p>' + linkifyMentions(esc(b.text)) + '</p>';
+    }).join('');
+  }
+  function renderReports() {
+    var box = $('#reportList');
+    if (!box) return;
+    if (!REPORTS.items.length) { box.innerHTML = '<p class="empty">아직 올라온 보고가 없어요.</p>'; return; }
+    box.innerHTML = REPORTS.items.map(function (r) {
+      var open = !!REPORTS.open[r.id];
+      var body = REPORTS.bodies[r.id];
+      return '<article class="report card' + (open ? ' is-open' : '') + '" data-id="' + esc(r.id) + '">' +
+        '<button class="report-head" type="button" data-toggle="1" aria-expanded="' + open + '">' +
+          '<span class="report-title">' + esc(r.title) + '</span>' +
+          '<span class="report-meta">' + esc(stampLabel(r.created)) + ' · ' + esc((r.assignees || []).join('·') || '클로드') + '</span>' +
+          (r.result ? '<span class="report-sum">' + esc(r.result) + '</span>' : '') +
+        '</button>' +
+        (open ? '<div class="report-body">' + (body ? renderReportBody(body) : '<p class="empty">불러오는 중…</p>') +
+          '<a class="task-link" href="' + esc(r.url) + '" target="_blank" rel="noopener">노션에서 보기 ↗</a></div>' : '') +
+        '</article>';
+    }).join('');
+  }
+  function loadReports() {
+    if (!relay()) return Promise.resolve();
+    return relayFetch('/api/reports').then(function (j) {
+      REPORTS.items = j.items || [];
+      if (REPORTS.items.length && !Object.keys(REPORTS.open).length) toggleReport(REPORTS.items[0].id, true);
+      renderReports();
+      if (state.tab === 'report') markReportsSeen(); else reportBadge();
+    }).catch(function () { var box = $('#reportList'); if (box && !REPORTS.items.length) box.innerHTML = '<p class="empty">보고를 불러오지 못했어요.</p>'; });
+  }
+  function toggleReport(id, force) {
+    REPORTS.open[id] = force === true ? true : !REPORTS.open[id];
+    renderReports();
+    if (REPORTS.open[id] && !REPORTS.bodies[id]) {
+      relayFetch('/api/reports?id=' + encodeURIComponent(id)).then(function (j) {
+        REPORTS.bodies[id] = j.blocks || []; renderReports();
+      }).catch(function () { REPORTS.bodies[id] = [{ t: 'p', text: '본문을 불러오지 못했어요.' }]; renderReports(); });
+    }
+  }
+  function initReports() {
+    var box = $('#reportList');
+    if (box) box.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-toggle]');
+      if (!t) return;
+      var card = t.closest('[data-id]');
+      if (card) toggleReport(card.getAttribute('data-id'));
+    });
+    loadReports();
+    setInterval(function () { if (!document.hidden) loadReports(); }, 300000);
+  }
+
   /* ── 회의실 실시간: 노션 '회의' 페이지 댓글 (중계 서버 /api/chat) ── */
   var LIVE = { rooms: [], msgs: {}, at: '', timer: null };
   function isLiveRoom() { return /^n:/.test(state.room || ''); }
@@ -1342,6 +1420,7 @@
     initInbox();
     initLiveChat();
     initBoard();
+    initReports();
     setTab(state.tab, { hash: false });
   }
 
