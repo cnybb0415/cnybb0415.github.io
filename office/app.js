@@ -15,7 +15,7 @@
 
   var TABS = ['map', 'meeting', 'work', 'staff', 'memo'];
   var ROOM_ON = { main: 3, command: 3, lounge: 2, office: 3 };
-  var MENTION_LIST = ['@all', '@귤이', '@클로드', '@지피티'];
+  var MENTION_LIST = ['@all', '@귤이', '@감이', '@클로드', '@지피티'];
   var SENDERS = ['nayeong', 'gyuri', 'claude', 'gpt'];
 
   var DATA = null;
