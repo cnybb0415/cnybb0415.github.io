@@ -11,7 +11,7 @@
 <meta name="referrer" content="no-referrer" />
 <title>나영 비서실</title>
 <script>try{if(sessionStorage.getItem('ny-office:session')==='1')document.documentElement.classList.add('is-authed');}catch(e){}</script>
-<link rel="stylesheet" href="styles.css?v=20261127d" />
+<link rel="stylesheet" href="styles.css?v=20261127e" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%91%3C/text%3E%3C/svg%3E" />
 </head>
 <body>
@@ -192,6 +192,7 @@
         <h2>작업실</h2>
         <p>지금 돌고 있는 일과 끝난 일을 모아 뒀어요.</p>
       </div>
+      <p class="board-note" id="boardNote"></p>
       <div class="filter-row" id="workFilters" role="group" aria-label="작업 필터">
         <button class="filter is-active" data-filter="all" type="button">전체</button>
         <button class="filter" data-filter="active" type="button">진행 중</button>
@@ -205,7 +206,7 @@
     <section class="panel" id="panel-staff" role="tabpanel" aria-labelledby="tabbtn-staff" hidden>
       <div class="work-head">
         <h2>비서현황</h2>
-        <p>지금 나영 님을 돕는 세 명이에요.</p>
+        <p id="staffSub">지금 나영 님을 돕는 비서들이에요.</p>
       </div>
       <div class="staff-list" id="staffList"></div>
       <div class="card note-card">
@@ -250,6 +251,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="app.js?v=20261127d"></script>
+<script src="app.js?v=20261127e"></script>
 </body>
 </html>

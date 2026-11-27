@@ -157,14 +157,15 @@
     }
 
     var tasks = DATA.tasks || [];
-    var done = tasks.filter(function (t) { return t.status === 'done'; }).length;
-    var active = tasks.filter(function (t) { return t.status === 'active'; }).length;
+    var lc = DATA.liveCounts;
+    var done = lc ? lc.todayDone : tasks.filter(function (t) { return t.status === 'done'; }).length;
+    var active = lc ? lc.active + lc.check : tasks.filter(function (t) { return t.status === 'active'; }).length;
     var stats = $('#mapStats');
     if (stats) {
       stats.innerHTML = [
         '<div class="stat"><span class="stat-value green">' + done + '</span><span class="stat-label">오늘 완료</span></div>',
         '<div class="stat"><span class="stat-value brown">' + active + '</span><span class="stat-label">진행 중</span></div>',
-        '<div class="stat"><span class="stat-value">' + (DATA.assistants || []).length + '</span><span class="stat-label">대기 중인 비서</span></div>'
+        '<div class="stat"><span class="stat-value">' + (DATA.assistants || []).length + '</span><span class="stat-label">' + (lc ? '함께하는 비서' : '대기 중인 비서') + '</span></div>'
       ].join('');
     }
 
@@ -175,14 +176,15 @@
           '<span class="mini-emoji" aria-hidden="true">' + esc(t.emoji) + '</span>' +
           '<span class="mini-body"><span class="mini-title">' + esc(t.title) + '</span>' +
           '<span class="mini-meta">' + esc(t.owner) + ' · ' + esc(t.time) + '</span></span>' +
-          '<span class="pill ' + pillClass(t.status) + '">' + esc(t.statusLabel) + '</span>' +
+          '<span class="pill ' + pillClass(t.status, t.statusLabel) + '">' + esc(t.statusLabel) + '</span>' +
           '</button>';
       }).join('');
     }
 
     var sched = $('#mapSchedule');
     if (sched) {
-      sched.innerHTML = (DATA.schedule || []).map(function (s) {
+      if (DATA.liveCounts && !(DATA.schedule || []).length) { sched.innerHTML = '<li>마감 잡힌 일이 없어요</li>'; }
+      else sched.innerHTML = (DATA.schedule || []).map(function (s) {
         return '<li class="' + (s.kind === 'today' ? 'is-today' : '') + '">' +
           '<span class="schedule-when">' + esc(s.when) + '</span>' + esc(s.what) +
           '<span class="schedule-who">' + esc(s.who) + '</span></li>';
@@ -193,7 +195,8 @@
     if ($('#footerUpdated')) $('#footerUpdated').textContent = '데이터 갱신 ' + stampLabel(DATA.updatedAt) + ' · 오피스 맵은 이미지 일러스트';
   }
 
-  function pillClass(status) {
+  function pillClass(status, label) {
+    if (label === '확인 필요') return 'pill-check';
     if (status === 'done') return 'pill-done';
     if (status === 'active') return 'pill-active';
     return 'pill-planned';
@@ -207,6 +210,8 @@
       return state.filter === 'all' ? true : t.status === state.filter;
     });
 
+    var note = $('#boardNote');
+    if (note) note.textContent = DATA.liveCounts ? '노션 AI 회사 기준 · ' + stampLabel(DATA.updatedAt) + ' 갱신 · 완료는 최근 3일' : '';
     if (!tasks.length) {
       list.innerHTML = '<p class="empty">이 상태의 작업이 없어요.</p>';
       return;
@@ -230,12 +235,13 @@
             '<p class="task-meta"><span class="task-tag">' + esc(t.tag) + '</span>' +
               '<span>' + esc(t.owner) + '</span><span>·</span><span>' + esc(t.time) + '</span></p>' +
           '</div>' +
-          '<span class="pill ' + pillClass(t.status) + '">' + esc(t.statusLabel) + '</span>' +
+          '<span class="pill ' + pillClass(t.status, t.statusLabel) + '">' + esc(t.statusLabel) + '</span>' +
         '</div>' +
         '<p class="task-summary">' + esc(t.summary) + '</p>' +
         (metrics ? '<div class="metric-row">' + metrics + '</div>' : '') +
         (bullets ? '<ul class="task-bullets">' + bullets + '</ul>' : '') +
         (t.next ? '<p class="task-next"><span aria-hidden="true">⏭</span><span>' + esc(t.next) + '</span></p>' : '') +
+        (t.url ? '<a class="task-link" href="' + esc(t.url) + '" target="_blank" rel="noopener">노션에서 보기 ↗</a>' : '') +
         '</article>';
     }).join('');
   }
@@ -1163,6 +1169,59 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) loadInbox(true); });
   }
 
+  /* ── 현황판 실시간: 노션 AI 회사 DB (중계 서버 /api/board) ── */
+  var GAMI_PROFILE = {
+    id: 'gami', emoji: '🟠', name: '감이', role: '두 번째 피클', tag: '제작 · 디자인 요소', state: 'active', stateLabel: '',
+    color: '#E37A3B', summary: '디지털 상품과 미리캔버스 요소를 만드는 제작 담당 비서예요.',
+    duties: ['미리캔버스 요소 생성·전처리', '상품 미리보기 이미지', '제작물 드라이브 정리'],
+    recent: [], integration: '노션(AI 회사) · 구글 드라이브', link: { label: '노션 AI 회사', url: 'https://app.notion.com/p/3acf852d228f8005a8d4f877551b3d60' }
+  };
+  function applyBoard(j) {
+    if (!j || !Array.isArray(j.tasks)) return;
+    DATA.tasks = j.tasks.slice(0, 40).map(function (t) {
+      return { id: t.id, url: t.url, emoji: t.emoji, title: t.title, owner: t.owner, tag: t.tag,
+        status: t.status === 'check' ? 'active' : t.status, statusLabel: t.statusLabel, time: t.time, summary: t.summary };
+    });
+    DATA.schedule = j.schedule || [];
+    DATA.liveCounts = j.counts || null;
+    DATA.updatedAt = j.at || DATA.updatedAt;
+    var list = DATA.assistants || [];
+    if (!list.some(function (a) { return a.name === '감이'; })) list.push(GAMI_PROFILE);
+    list.forEach(function (a) {
+      var st = j.staff && j.staff[a.name];
+      if (!st) return;
+      a.recent = st.recent.length ? st.recent : a.recent;
+      var bits = [];
+      if (st.check) bits.push('확인 필요 ' + st.check);
+      bits.push('진행 ' + st.running);
+      bits.push('대기 ' + st.waiting);
+      a.stateLabel = bits.join(' · ');
+      a.state = (st.running || st.waiting || st.check) ? 'active' : 'manual';
+    });
+    DATA.assistants = list;
+    var sub = document.getElementById('staffSub');
+    if (sub) sub.textContent = '지금 나영 님을 돕는 ' + list.length + '명 · 숫자는 노션 기준 실시간이에요.';
+    var c = j.counts || {};
+    DATA.headline = Object.assign({}, DATA.headline, {
+      title: c.check ? '대장님, 확인할 일 ' + c.check + '건이 있어요' : '대장님, 진행 중인 일 ' + (c.active || 0) + '건이에요',
+      desc: '오늘 완료 ' + (c.todayDone || 0) + '건 · 노션 기준 ' + stampLabel(DATA.updatedAt) + ' 갱신'
+    });
+    DATA.mapChips = (DATA.mapChips || []).filter(function (x) { return x.kind !== 'status'; }).concat([
+      { emoji: '🟢', label: '노션 실시간', kind: 'status' },
+      { emoji: '👥', label: '비서 ' + list.length + '명', kind: 'status' }
+    ]);
+    renderMap(); renderTasks(); renderStaff();
+  }
+  function loadBoard() {
+    if (!relay()) return Promise.resolve();
+    return relayFetch('/api/board').then(applyBoard).catch(function () { /* 실패하면 저장된 현황 그대로 */ });
+  }
+  function initBoard() {
+    loadBoard();
+    setInterval(function () { if (!document.hidden) loadBoard(); }, 300000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) loadBoard(); });
+  }
+
   /* ── 회의실 실시간: 노션 '회의' 페이지 댓글 (중계 서버 /api/chat) ── */
   var LIVE = { rooms: [], msgs: {}, at: '', timer: null };
   function isLiveRoom() { return /^n:/.test(state.room || ''); }
@@ -1282,6 +1341,7 @@
     bindEvents();
     initInbox();
     initLiveChat();
+    initBoard();
     setTab(state.tab, { hash: false });
   }
 
