@@ -290,3 +290,13 @@ html:not(.theme-classic) .text-btn { color: #c23d80; }
   .theme-btn, .lock-btn { padding-left: 9px; padding-right: 9px; }
   .lock-btn span { display: none; }
 }
+
+/* ── 오피스 맵: Y2K 데스크톱 콜라주 그림 (감이 11/28) — 클래식 테마는 원래 그림 ── */
+html:not(.theme-classic) .map-classic,
+html.theme-classic .map-y2k { display: none; }
+html:not(.theme-classic) .map-wrap { background: #9fd4ff; }
+/* 이름표는 각 창 제목줄 위에 */
+html:not(.theme-classic) .room-pin[data-room="command"] { left: 52.5% !important; top: 12.4% !important; }
+html:not(.theme-classic) .room-pin[data-room="main"]    { left: 18.5% !important; top: 9.1% !important; }
+html:not(.theme-classic) .room-pin[data-go="work"]      { left: 21.7% !important; top: 55.7% !important; }
+html:not(.theme-classic) .room-pin[data-room="lounge"]  { left: 85% !important; top: 33.9% !important; }
