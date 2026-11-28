@@ -300,3 +300,6 @@ html:not(.theme-classic) .room-pin[data-room="command"] { left: 52.5% !important
 html:not(.theme-classic) .room-pin[data-room="main"]    { left: 18.5% !important; top: 9.1% !important; }
 html:not(.theme-classic) .room-pin[data-go="work"]      { left: 21.7% !important; top: 55.7% !important; }
 html:not(.theme-classic) .room-pin[data-room="lounge"]  { left: 85% !important; top: 33.9% !important; }
+
+html:not(.theme-classic) .chat-wide-btn { background: #fff; border: 1.5px solid #f39cc6; color: #b8367a; border-radius: 8px; }
+html:not(.theme-classic) .msg.is-me .bubble.is-long:not(.is-open)::after { background: linear-gradient(rgba(255,214,234,0), #ffd6ea); }

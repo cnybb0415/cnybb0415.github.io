@@ -343,7 +343,7 @@
             '<span class="msg-role">' + esc(p.role) + '</span>' +
             '<span class="msg-time">' + esc(m.time || '') + '</span>' +
           '</div>' +
-          '<div class="bubble">' + linkifyMentions(esc(m.text)) + '</div>' +
+          bubbleHtml(m.text) +
         '</div>' +
       '</div>';
     }).join('');
@@ -353,6 +353,27 @@
     var stick = toBottom || nearBottom;
     list.scrollTop = stick ? list.scrollHeight : keepTop;
     newMsgPill(changed && !stick && msgs.length > 0);
+  }
+
+  /* 긴 메시지 읽기 쉽게: 번호·'할 일:' 같은 항목마다 줄 바꿈, 길면 접기 */
+  function readable(text) {
+    var t = String(text || '').replace(/\r/g, '');
+    // 맨 앞 "@받는이 [상태]" 뒤에서 한 줄 띄우기
+    t = t.replace(/^((?:@[^\s]+\s*)+(?:\[[^\]]{1,6}\]\s*)?)/, function (m0) { return m0.trim() + '\n'; });
+    // ①②③… / 1) 2) / 「할 일:」「파일·링크:」「끝난 기준:」 같은 항목 앞에서 줄 바꿈
+    t = t.replace(/\s+([①-⑳])/g, '\n$1');
+    t = t.replace(/\s+(?=(?:할 일|파일·링크|끝난 기준|마감|이유|근거|결과|걱정|장점|단점|조건|다음|유도|문구|번역)\s*:)/g, '\n');
+    t = t.replace(/\s+\/\s+/g, '\n');
+    t = t.replace(/\s+(?=\d\)\s)/g, '\n');
+    // 문장 끝 마침표 다음 긴 문장은 줄 바꿈 (짧은 메시지는 그대로)
+    if (t.length > 140) t = t.replace(/([.!?요다])\s+(?=[^\n]{20,})/g, '$1\n');
+    return t.replace(/\n{3,}/g, '\n\n').trim();
+  }
+  function bubbleHtml(text) {
+    var body = linkifyMentions(esc(readable(text)));
+    var long = String(text || '').length > 320;
+    return '<div class="bubble' + (long ? ' is-long' : '') + '">' + body +
+      (long ? '<button class="bubble-more" type="button" data-more="1">더 보기 ▾</button>' : '') + '</div>';
   }
 
   /* 위를 읽는 중에 새 말이 오면 '새 말 ↓' 버튼으로만 알려요 (자동으로 끌어내리지 않음) */
@@ -544,6 +565,7 @@
     document.body.classList.toggle('chat-lock', tab === 'meeting');
 
     if (tab === 'meeting') {
+      var cs = $('#connSheet'); if (cs && !cs.hasAttribute('hidden')) { cs.setAttribute('hidden', ''); var cb = $('#connBadge'); if (cb) cb.setAttribute('aria-expanded', 'false'); }
       renderRoomChips();
       renderChat(true);
       if (isLiveRoom()) loadLiveMessages(true);
@@ -644,6 +666,28 @@
         return;
       }
     });
+
+    var chatList = $('#chatList');
+    if (chatList) chatList.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-more]');
+      if (!b) return;
+      var bub = b.closest('.bubble');
+      var open = bub.classList.toggle('is-open');
+      b.textContent = open ? '접기 ▴' : '더 보기 ▾';
+    });
+    var wideBtn = document.getElementById('chatWideBtn');
+    if (wideBtn) wideBtn.addEventListener('click', function () {
+      var on = document.body.classList.toggle('chat-wide');
+      wideBtn.textContent = on ? '⤡ 작게' : '⤢ 크게';
+      safeSet('ny-office:chat-wide', on ? '1' : '');
+      requestAnimationFrame(fitChatPanel);
+    });
+    if (safeGet('ny-office:chat-wide', '') === '1' && wideBtn) { document.body.classList.add('chat-wide'); wideBtn.textContent = '⤡ 작게'; }
+    var cinput = $('#chatInput');
+    if (cinput) {
+      cinput.addEventListener('focus', function () { document.body.classList.add('chat-typing'); requestAnimationFrame(fitChatPanel); });
+      cinput.addEventListener('blur', function () { setTimeout(function () { document.body.classList.remove('chat-typing'); fitChatPanel(); }, 150); });
+    }
 
     var connBadge = $('#connBadge');
     if (connBadge) {
