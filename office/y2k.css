@@ -1,0 +1,281 @@
+/* ═══════════════════════════════════════════
+   나영 비서실 — Y2K · 미니홈피 키치 테마 (1차, 11/28 클로드)
+   styles.css 위에 덮어쓰는 층. html.theme-classic 이면 꺼져요.
+   ═══════════════════════════════════════════ */
+
+@font-face {
+  font-family: "Galmuri11";
+  font-weight: 400;
+  font-display: swap;
+  src: url("assets/fonts/Galmuri11.woff2") format("woff2"); /* OFL-1.1, assets/fonts/Galmuri-OFL.txt */
+}
+
+html:not(.theme-classic) {
+  --bg: #dff1ff;
+  --bg-2: #f3faff;
+  --card: #ffffff;
+  --card-2: #fff6fb;
+  --ink: #3a2f4a;
+  --ink-2: #5d4f73;
+  --muted: #8f84a6;
+  --line: #f4bfd9;
+  --line-soft: #fde3f0;
+  --brown: #e9559b;          /* 강조색: 핫핑크 */
+  --brown-2: #ff7bb8;
+  --brown-deep: #c23d80;
+  --peach: #ffe3f1;
+  --peach-line: #ffbcdc;
+  --green: #36b37e;
+  --sky: #9fd4ff;
+  --sky-deep: #5aa9ee;
+  --lilac: #cdb6ff;
+  --win-bar: linear-gradient(90deg, #ffb3d6 0%, #ffd3ea 55%, #c9e8ff 100%);
+  --shadow: 3px 3px 0 #c9a9e8;
+  --shadow-sm: 2px 2px 0 #e3cdf5;
+  --r-lg: 10px;
+  --r-md: 8px;
+  --r-sm: 6px;
+  --pixel: "Galmuri11", var(--font);
+}
+
+/* ── 배경: 하늘 + 격자 + 반짝이 ── */
+html:not(.theme-classic) body {
+  background:
+    radial-gradient(circle at 12% 18%, #fff 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 9%, #fff 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 64% 62%, #fff 0 2px, transparent 3px),
+    radial-gradient(circle at 30% 80%, #fff 0 1.5px, transparent 2.5px),
+    linear-gradient(rgba(255,255,255,.45) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, rgba(255,255,255,.45) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(180deg, #c8e7ff 0%, #e4f2ff 45%, #ffe6f3 100%);
+  background-attachment: fixed;
+}
+
+/* ── 상단: 피처폰 화면 느낌 ── */
+html:not(.theme-classic) .top-fixed {
+  background: linear-gradient(180deg, #ffe0ef 0%, #fff0f7 100%);
+  border-bottom: 2px solid #f7a8cd;
+  box-shadow: 0 3px 0 #f9d0e5;
+}
+html:not(.theme-classic) .brand-face {
+  border-radius: 10px;
+  background: #fff;
+  border: 2px solid #f39cc6;
+  box-shadow: 2px 2px 0 #c9a9e8;
+}
+html:not(.theme-classic) .brand-text h1,
+html:not(.theme-classic) .brand-text .title,
+html:not(.theme-classic) .lock-title,
+html:not(.theme-classic) .work-head h2,
+html:not(.theme-classic) .section-head h3 {
+  font-family: var(--pixel);
+  letter-spacing: 0;
+  color: #b8367a;
+}
+html:not(.theme-classic) .section-head h3::before { content: "♡ "; color: #ff7bb8; }
+
+/* ── 탭: 미니홈피 메뉴 버튼 ── */
+html:not(.theme-classic) .tabs { gap: 4px; }
+html:not(.theme-classic) .tab {
+  border-radius: 6px;
+  background: #fff;
+  border: 1.5px solid #f4bfd9;
+  color: #7a5f92;
+  font-family: var(--pixel);
+  font-weight: 400;
+}
+html:not(.theme-classic) .tab[aria-selected="true"] {
+  background: linear-gradient(180deg, #ff8cc3, #f25fa4);
+  border-color: #d94a8e;
+  color: #fff;
+  box-shadow: 2px 2px 0 #c9a9e8;
+}
+html:not(.theme-classic) .tab-badge { background: #5aa9ee; border-radius: 4px; }
+
+/* ── 카드 = 창(window): 분홍→하늘 타이틀바 + 점 3개 ── */
+html:not(.theme-classic) .card,
+html:not(.theme-classic) .task,
+html:not(.theme-classic) .staff,
+html:not(.theme-classic) .lock-card {
+  background: #fff;
+  border: 2px solid #f39cc6;
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 #c9a9e8;
+  position: relative;
+}
+html:not(.theme-classic) .card { padding-top: 22px; }
+html:not(.theme-classic) .task,
+html:not(.theme-classic) .staff { padding-top: 26px; }
+html:not(.theme-classic) .card::before,
+html:not(.theme-classic) .staff::before,
+html:not(.theme-classic) .lock-card::before {
+  content: "● ● ●";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 16px;
+  padding-left: 8px;
+  font-size: 7px;
+  line-height: 16px;
+  letter-spacing: 1px;
+  color: #fff;
+  background: var(--win-bar);
+  border-bottom: 1.5px solid #f39cc6;
+  border-radius: 7px 7px 0 0;
+  text-shadow: 0 0 1px #e9559b;
+}
+/* task 는 왼쪽 색띠(::before)를 원래 쓰니 타이틀바는 ::after */
+html:not(.theme-classic) .task::after {
+  content: "● ● ●";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 16px;
+  padding-left: 12px;
+  font-size: 7px;
+  line-height: 16px;
+  color: #fff;
+  background: var(--win-bar);
+  border-bottom: 1.5px solid #f39cc6;
+}
+html:not(.theme-classic) .hero::after {
+  content: "★";
+  background: none;
+  width: auto; height: auto;
+  right: 14px; top: 20px;
+  font-size: 28px;
+  color: #ffd84d;
+  text-shadow: 2px 2px 0 #f39cc6;
+}
+html:not(.theme-classic) .hero-label {
+  font-family: var(--pixel);
+  background: #fff0f7;
+  border: 1.5px dashed #f39cc6;
+  border-radius: 6px;
+  color: #c23d80;
+}
+
+/* ── 칩·필·핀: 스티커 ── */
+html:not(.theme-classic) .chip,
+html:not(.theme-classic) .room-chip,
+html:not(.theme-classic) .s-chip {
+  background: #fff;
+  border: 1.5px solid #9fd4ff;
+  border-radius: 6px;
+  color: #3e6f9e;
+  box-shadow: 1px 1px 0 #cfe6ff;
+}
+html:not(.theme-classic) .room-pin {
+  font-family: var(--pixel);
+  font-weight: 400;
+  color: #b8367a;
+  background: #fff;
+  border: 1.5px solid #f39cc6;
+  border-radius: 6px;
+  box-shadow: 2px 2px 0 #c9a9e8;
+}
+html:not(.theme-classic) .pill { border-radius: 4px; }
+html:not(.theme-classic) .pill-active { color: #c23d80; background: #ffe3f1; border-color: #ffbcdc; }
+html:not(.theme-classic) .pill-planned { color: #3e6f9e; background: #e6f3ff; border-color: #bfe0ff; }
+
+/* ── 회의실: 말풍선 채팅 ── */
+html:not(.theme-classic) .bubble {
+  background: #fff;
+  border: 1.5px solid #bfe0ff;
+  border-radius: 12px 12px 12px 2px;
+  color: #3a2f4a;
+  box-shadow: 2px 2px 0 #dcecff;
+}
+html:not(.theme-classic) .msg.is-me .bubble {
+  background: #ffe9f4;
+  border-color: #ffbcdc;
+  border-radius: 12px 12px 2px 12px;
+  box-shadow: 2px 2px 0 #f9d0e5;
+}
+html:not(.theme-classic) .msg-name { color: #b8367a; font-family: var(--pixel); font-weight: 400; }
+
+/* ── 버튼 ── */
+html:not(.theme-classic) .btn,
+html:not(.theme-classic) .ib-btn,
+html:not(.theme-classic) .memo-btn,
+html:not(.theme-classic) .lock-key,
+html:not(.theme-classic) .lock-pass-btn,
+html:not(.theme-classic) .lock-btn,
+html:not(.theme-classic) .conn-badge {
+  border-radius: 6px;
+}
+html:not(.theme-classic) .btn-primary,
+html:not(.theme-classic) .lock-pass-btn {
+  background: linear-gradient(180deg, #ff8cc3, #f25fa4);
+  color: #fff;
+  border: 1.5px solid #d94a8e;
+  box-shadow: 2px 2px 0 #c9a9e8;
+}
+html:not(.theme-classic) .btn-ghost { background: #fff; border-color: #bfe0ff; color: #3e6f9e; }
+html:not(.theme-classic) .btn-soft { background: #fff0f7; border-color: #ffbcdc; color: #c23d80; }
+html:not(.theme-classic) .btn:focus-visible { outline: 2px dashed #5aa9ee; }
+
+/* ── 잠금 화면 ── */
+html:not(.theme-classic) .lock {
+  background:
+    linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(180deg, #c8e7ff 0%, #ffe6f3 100%);
+}
+html:not(.theme-classic) .lock-card { padding-top: 30px; }
+html:not(.theme-classic) .lock-key {
+  background: #fff;
+  border: 1.5px solid #f4bfd9;
+  font-family: var(--pixel);
+  color: #7a5f92;
+  box-shadow: 2px 2px 0 #e3cdf5;
+}
+html:not(.theme-classic) .lock-dot.is-on,
+html:not(.theme-classic) .lock-dot.on { background: #f25fa4; }
+
+/* ── 보고·메모 ── */
+html:not(.theme-classic) .report-title,
+html:not(.theme-classic) .report-body h4 { color: #b8367a; }
+html:not(.theme-classic) .report-body { border-top-color: #f4bfd9; color: #3a2f4a; }
+html:not(.theme-classic) .rp-q { background: #f3f9ff; border: 1px dashed #9fd4ff; }
+
+/* ── 테마 전환 버튼 ── */
+.theme-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 9px;
+  border-radius: 6px;
+  border: 1.5px solid #f4bfd9;
+  background: #fff;
+  color: #c23d80;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+html.theme-classic .theme-btn { border-color: var(--line); color: var(--ink-2); border-radius: 999px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.theme-classic) .hero::after { animation: y2k-twinkle 2.4s steps(2) infinite; }
+}
+@keyframes y2k-twinkle { 50% { opacity: .35; } }
+
+/* ── 남은 갈색 정리 ── */
+html:not(.theme-classic) .lock-badge {
+  background: #fff0f7;
+  border: 2px solid #f39cc6;
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 #c9a9e8;
+}
+html:not(.theme-classic) .lock-pass-input {
+  background: #f7fbff;
+  border: 2px solid #9fd4ff;
+  border-radius: 6px;
+  box-shadow: none;
+}
+html:not(.theme-classic) .lock-pass-input:focus { border-color: #f25fa4; outline: none; }
+html:not(.theme-classic) input[type="checkbox"] { accent-color: #f25fa4; }
+html:not(.theme-classic) .lock-btn { background: #fff; border: 1.5px solid #f4bfd9; color: #7a5f92; }
+html:not(.theme-classic) .conn-badge { background: #fff; border: 1.5px solid #9fd4ff; color: #3e6f9e; }
+html:not(.theme-classic) .hero h2,
+html:not(.theme-classic) .hero-title { color: #3a2f4a; }
+html:not(.theme-classic) .map-wrap { border: 2px solid #f39cc6; border-radius: 10px; box-shadow: 3px 3px 0 #c9a9e8; overflow: hidden; }
+html:not(.theme-classic) .footer { color: #8f84a6; border-top-color: #f4bfd9; }
+html:not(.theme-classic) .text-btn { color: #c23d80; }

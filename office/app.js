@@ -1424,6 +1424,23 @@
     setTab(state.tab, { hash: false });
   }
 
+  /* Y2K 테마 ↔ 기본 테마 (✿ 버튼, 이 기기에만 기억) */
+  function initTheme() {
+    var root = document.documentElement;
+    var KEY = 'ny-office:theme';
+    try { if (localStorage.getItem(KEY) === 'classic') root.classList.add('theme-classic'); } catch (e) {}
+    var b = document.getElementById('themeBtn');
+    if (!b) return;
+    function label() { b.setAttribute('aria-pressed', root.classList.contains('theme-classic') ? 'false' : 'true'); }
+    label();
+    b.addEventListener('click', function () {
+      var classic = root.classList.toggle('theme-classic');
+      try { localStorage.setItem(KEY, classic ? 'classic' : 'y2k'); } catch (e) {}
+      label();
+    });
+  }
+  initTheme();
+
   document.addEventListener('DOMContentLoaded', function () {
     initLock(function (data) { boot(data || null); });
   });
