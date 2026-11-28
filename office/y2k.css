@@ -279,3 +279,14 @@ html:not(.theme-classic) .hero-title { color: #3a2f4a; }
 html:not(.theme-classic) .map-wrap { border: 2px solid #f39cc6; border-radius: 10px; box-shadow: 3px 3px 0 #c9a9e8; overflow: hidden; }
 html:not(.theme-classic) .footer { color: #8f84a6; border-top-color: #f4bfd9; }
 html:not(.theme-classic) .text-btn { color: #c23d80; }
+
+/* ── 좁은 휴대폰 머리줄: ✿ 버튼이 생기며 제목이 잘리던 것 정리 (11/28) ── */
+.brand-text h1 { line-height: 1.2; }
+.brand-text { min-width: 0; }
+.brand-text p, .brand-text .sub { white-space: nowrap; }
+@media (max-width: 430px) {
+  .conn-badge .conn-label { display: none; }
+  .conn-badge { padding-left: 10px; padding-right: 10px; }
+  .theme-btn, .lock-btn { padding-left: 9px; padding-right: 9px; }
+  .lock-btn span { display: none; }
+}
